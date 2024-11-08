@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Strength Checker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <nav class="tabs">
+            <a href="/" class="tab">Generate Password</a>
+            <a href="/check" class="tab active">Check Strength</a>
+        </nav>
+
+        <h1>Password Strength Checker</h1>
+        
+        <form method="POST" class="password-check-form">
+            <div class="form-group">
+                <label for="password">Enter Password:</label>
+                <div class="password-input-container">
+                    <input type="password" id="password" name="password" required>
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                        👁️
+                    </button>
+                </div>
+            </div>
+            <button type="submit">Check Strength</button>
+        </form>
+
+        {% if result %}
+        <div class="result">
+            <h2>Results:</h2>
+            <div class="strength-result" style="color: {{ result.color }}">
+                Strength: {{ result.strength }}
+            </div>
+            <div class="feedback-list">
+                <h3>Feedback:</h3>
+                <ul>
+                    {% for feedback in result.feedback %}
+                    <li>{{ feedback }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('password');
+        const toggleButton = document.querySelector('.toggle-password');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleButton.textContent = '🔒';
+        } else {
+            passwordInput.type = 'password';
+            toggleButton.textContent = '👁️';
+        }
+    }
+    </script>
+</body>
+</html> 

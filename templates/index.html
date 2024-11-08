@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire de Mot de Passe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+    <div class="container">
+        <h1>Gestionnaire de Mot de Passe</h1>
+        
+        <div class="tabs">
+            <a href="?view=generate" class="tab {% if view == 'generate' %}active{% endif %}">Générateur</a>
+            <a href="?view=check" class="tab {% if view == 'check' %}active{% endif %}">Vérificateur</a>
+        </div>
+
+        {% if view == 'generate' %}
+        <div class="generator-section">
+            <form method="POST">
+                <div class="form-group">
+                    <label for="length">Longueur:</label>
+                    <input type="number" id="length" name="length" value="12" min="4" max="50">
+                </div>
+
+                <div class="form-group options">
+                    <label><input type="checkbox" name="lowercase" checked> Minuscules (a-z)</label>
+                    <label><input type="checkbox" name="uppercase" checked> Majuscules (A-Z)</label>
+                    <label><input type="checkbox" name="numbers" checked> Chiffres (0-9)</label>
+                    <label><input type="checkbox" name="symbols" checked> Symboles (!@#$...)</label>
+                </div>
+
+                <button type="submit">Générer</button>
+            </form>
+
+            {% if password %}
+            <div class="result">
+                <h2>Votre mot de passe:</h2>
+                <div class="password-container">
+                    <div class="password" id="password">{{ password }}</div>
+                    <button type="button" class="copy-btn" onclick="copyPassword()">
+                        <span class="copy-text">Copier</span>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if view == 'check' %}
+        <div class="checker-section">
+            <form method="POST">
+                <div class="form-group">
+                    <label for="password">Entrez un mot de passe à vérifier:</label>
+                    <div class="password-input-container">
+                        <input type="password" id="password-check" name="password" required>
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+                <button type="submit">Vérifier</button>
+            </form>
+
+            {% if result %}
+            <div class="result">
+                <div class="strength-result" style="color: {{ result.color }}">
+                    Force: {{ result.strength }}
+                </div>
+                {% if result.feedback %}
+                <div class="feedback-list">
+                    <h3>Suggestions d'amélioration:</h3>
+                    <ul>
+                        {% for feedback in result.feedback %}
+                        <li>{{ feedback }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Configuration de l'effet Matrix
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+
+        // Mettre le canvas en plein écran
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Caractères pour l'effet Matrix (nombres binaires)
+        const chars = '01';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        // Initialiser les positions de départ de manière aléatoire
+        for (let i = 0; i < columns; i++) {
+            // Position initiale aléatoire au-dessus de l'écran
+            drops[i] = Math.floor(Math.random() * -canvas.height / fontSize);
+        }
+
+        // Fonction de dessin principale
+        function draw() {
+            // Fond semi-transparent pour créer l'effet de trace
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Style pour les caractères
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+
+            // Dessiner les caractères
+            for (let i = 0; i < drops.length; i++) {
+                // Ne dessiner que si la position est positive
+                if (drops[i] * fontSize > 0) {
+                    const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                    // Variation d'opacité pour plus de dynamisme
+                    ctx.fillStyle = `rgba(0, 255, 0, ${Math.random() * 0.5 + 0.5})`;
+                    ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                }
+
+                // Réinitialiser la position quand le caractère atteint le bas
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+
+                // Vitesse de chute légèrement aléatoire
+                drops[i] += Math.random() * 0.5 + 0.5;
+            }
+        }
+
+        // Animation
+        setInterval(draw, 33);
+
+        // Gestion des formulaires avec AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            // Gestion des onglets
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const view = this.getAttribute('href').split('=')[1];
+                    switchView(view);
+                });
+            });
+
+            // Gestion du formulaire de génération
+            const generateForm = document.querySelector('.generator-section form');
+            if (generateForm) {
+                generateForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    formData.append('view', 'generate');
+
+                    fetch('/', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.password) {
+                            const resultDiv = document.querySelector('.generator-section .result');
+                            if (!resultDiv) {
+                                const newResultDiv = document.createElement('div');
+                                newResultDiv.className = 'result';
+                                newResultDiv.innerHTML = `
+                                    <h2>Votre mot de passe:</h2>
+                                    <div class="password-container">
+                                        <div class="password" id="password">${data.password}</div>
+                                        <button type="button" class="copy-btn" onclick="copyPassword()">
+                                            <span class="copy-text">Copier</span>
+                                        </button>
+                                    </div>
+                                `;
+                                generateForm.insertAdjacentElement('afterend', newResultDiv);
+                            } else {
+                                document.getElementById('password').textContent = data.password;
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Gestion du formulaire de vérification
+            const checkForm = document.querySelector('.checker-section form');
+            if (checkForm) {
+                checkForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    formData.append('view', 'check');
+
+                    fetch('/', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        const resultDiv = document.querySelector('.checker-section .result');
+                        if (!resultDiv) {
+                            const newResultDiv = document.createElement('div');
+                            newResultDiv.className = 'result';
+                            newResultDiv.innerHTML = createResultHTML(data);
+                            checkForm.insertAdjacentElement('afterend', newResultDiv);
+                        } else {
+                            resultDiv.innerHTML = createResultHTML(data);
+                        }
+                    });
+                });
+            }
+        });
+
+        function switchView(view) {
+            // Mettre à jour l'URL sans recharger la page
+            history.pushState({}, '', `?view=${view}`);
+            
+            // Mettre à jour les onglets actifs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.getAttribute('href') === `?view=${view}`);
+            });
+
+            // Afficher/masquer les sections appropriées
+            document.querySelector('.generator-section')?.classList.toggle('hidden', view !== 'generate');
+            document.querySelector('.checker-section')?.classList.toggle('hidden', view !== 'check');
+        }
+
+        function createResultHTML(data) {
+            let html = `
+                <div class="strength-result" style="color: ${data.color}">
+                    Force: ${data.strength}
+                </div>`;
+            
+            if (data.feedback && data.feedback.length > 0) {
+                html += `
+                    <div class="feedback-list">
+                        <h3>Suggestions d'amélioration:</h3>
+                        <ul>
+                            ${data.feedback.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>`;
+            }
+            return html;
+        }
+
+        function copyPassword() {
+            const password = document.getElementById('password').textContent;
+            navigator.clipboard.writeText(password).then(() => {
+                const copyBtn = document.querySelector('.copy-btn .copy-text');
+                copyBtn.textContent = 'Copié!';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copier';
+                }, 2000);
+            });
+        }
+
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password-check');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+            } else {
+                passwordInput.type = 'password';
+            }
+        }
+    </script>
+</body>
+</html> 
